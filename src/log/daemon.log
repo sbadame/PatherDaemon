@@ -1,0 +1,23 @@
+2010-03-17 09:40:01,905 - daemon - INFO - ERROR: port /dev/ttyUSB0 could not be opened, defaulting to -X mode
+2010-03-17 09:41:56,009 - daemon - INFO - ERROR: port /dev/ttyUSB0 could not be opened, defaulting to -X mode
+2010-03-17 09:41:56,009 - daemon - INFO - PW,0,0
+
+2010-03-17 09:41:56,009 - daemon - INFO - PW,1,0
+
+2010-03-17 09:42:52,275 - daemon - INFO - ERROR: port /dev/ttyUSB0 could not be opened, defaulting to -X mode
+2010-03-17 09:42:52,275 - daemon - INFO - PW,0,0
+
+2010-03-17 09:42:52,275 - daemon - INFO - PW,1,0
+
+2010-03-17 09:42:52,275 - daemon - INFO - Listening to port 21567, accepting a maximum of 1 clients.
+2010-03-17 16:56:01,096 - daemon - INFO - ERROR: port /dev/ttyUSB0 could not be opened, defaulting to -X mode
+2010-03-17 16:56:25,199 - daemon - INFO - ERROR: port /dev/ttyUSB0 could not be opened, defaulting to -X mode
+2010-03-17 16:56:25,199 - daemon - INFO - Command Sent: PW,0,0
+
+2010-03-17 16:56:25,199 - daemon - INFO - Command Sent: PW,1,0
+
+2010-03-17 16:56:25,199 - daemon - INFO - Listening to port 21567, accepting a maximum of 1 clients.
+2010-03-17 16:56:38,350 - daemon - INFO - ERROR: port /dev/ttyUSB0 could not be opened, defaulting to -X mode
+2010-03-17 16:56:38,350 - daemon - INFO - Command Sent: PW,0,0
+2010-03-17 16:56:38,350 - daemon - INFO - Command Sent: PW,1,0
+2010-03-17 16:56:38,350 - daemon - INFO - Listening to port 21567, accepting a maximum of 1 clients.
