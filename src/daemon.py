@@ -129,8 +129,8 @@ class ClientRead(threading.Thread):
     
     def run(self):
         data = ""
-        while True:
-            chunk = str(self.socket.recv(4096))
+        while True:#insted of multiple threads, make daemon use this one only over and over
+            chunk = str(self.socket.recv(4096))#maybe look at documentation regarding socket
             if chunk == "":
                 #Uh oh this isn't supposed to happen!
                 STOP_BOT()
@@ -138,7 +138,7 @@ class ClientRead(threading.Thread):
                 break
             data = data + chunk
             while "!" in data: #Messages must be deliminated by a "!"
-                i = data.find("!")
+                i = data.find("!")#the !'s should now be \n's for this line and previos line
                 command = data[0:i]
                 if command == "CLOSE":
                     self.socket.shutdown(socket.SHUT_RDWR)
@@ -182,7 +182,7 @@ log.info("Listening to port %d for clients." % _port)
 diagnostic.startServer()
 
 #begin loop
-while True:
+while True:#waits for ppl to connect
     (clientsocket, address) = server.accept()
     log.info("Connection made from %s" % address)
     ClientRead(clientsocket, address).start()
