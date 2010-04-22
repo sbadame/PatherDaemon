@@ -25,6 +25,7 @@ import threading
 from serial.serialutil import SerialException
 from threading import Thread
 import diagnostic
+from Queue import Queue
 
 #Open the com port
 _serialport = ""
@@ -108,16 +109,35 @@ if _USESERIAL:
         _USESERIAL = False
         log.info("ERROR: port %s could not be opened, defaulting to -X mode" % _serialport)
 
-def handleArduinoCommand(command):#aka Arduino sending info to client
+def handleArduinoCommand(command):
 	if clientsocket != None:
 		clientsocket.write(command)
 	log.info("Arduino Command Sent: %s" % command)
        
-def handleCommand(command):#aka send command to Arduino
+def handleCommandFromClient(command):
     global log
     log.info("Command Sent: %s" % command)
-    if patherport != None:
-        patherport.write(command)
+    command = command.split(",")
+    q = Queue()
+    try q.get():
+	#do work on gotten command
+    except Empty:#Will prevent program from exploding
+	#move on in life
+
+    if command[0] ==  "Beacon":
+	#do something
+    elif command[0] == "Proximity":
+	#proximity stuff
+    elif command[0] == "Keypad":
+	#keypad stuff
+    elif command[0] == "Distance":
+	#distance
+    elif command[0] == "Move":
+	#dfsd
+    elif command[0] == "Turn":
+	#sfdgsrgs
+    elif command[0] == "Cancel":
+	#jdghjds
 
 #Emergency stop command for the pather
 def STOP_BOT():
@@ -151,7 +171,7 @@ class ClientRead(threading.Thread):
                     self.socket.close()
                     break
                 else:
-                    handleCommand(self, data[0:i])
+                    handleCommandFromClient(self, data[0:i])
                 data = data[i + 1:]
                 
             log.info("Data Received from %s: %s" % (self.addr, data))
