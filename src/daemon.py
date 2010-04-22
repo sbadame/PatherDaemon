@@ -23,7 +23,7 @@ import socket
 import sys
 import threading
 from serial.serialutil import SerialException
-#from threading import Thread
+from threading import Thread
 import diagnostic
 
 #Open the com port
@@ -97,8 +97,8 @@ for opt, args in opts:
             _serialport = args
     log.info("-s option detected, using port=%s" % _serialport);
     
-
 #Grab the parallel port and clear it
+clientsocket = None
 patherport = None
 if _USESERIAL:
     try:
@@ -107,8 +107,13 @@ if _USESERIAL:
         patherport = None
         _USESERIAL = False
         log.info("ERROR: port %s could not be opened, defaulting to -X mode" % _serialport)
-        
-def handleCommand(command):
+
+def handleArduinoCommand(command):#aka Arduino sending info to client
+	if clientsocket != None:
+		clientsocket.write(command)
+	log.info("Arduino Command Sent: %s" % command)
+       
+def handleCommand(command):#aka send command to Arduino
     global log
     log.info("Command Sent: %s" % command)
     if patherport != None:
@@ -130,8 +135,8 @@ class ClientRead(threading.Thread):
     
     def run(self):
         data = ""
-        while True:#insted of multiple threads, make daemon use this one only over and over
-            chunk = str(self.socket.recv(4096))#maybe look at documentation regarding socket
+        while True:
+            chunk = str(self.socket.recv(4096))
             if chunk == "":
                 #Uh oh this isn't supposed to happen!
                 STOP_BOT()
@@ -154,18 +159,31 @@ class ClientRead(threading.Thread):
     def notifyCommandSent(self, command):
         self.socket.sendAll("Command: %s" % command)
         
-# Class that is responsible to read info from the UBW32
+# Class that is responsible to read info from the Arduino
 class SerialReader(threading.Thread):
     
     def __init__(self, serial):
         self.serial = serial
     
     def run(self):
-        for response in self.serial:
-            log.info("Received response: %s" % response)
+	data = ""
+        while True:
+            chunk = str(self.socket.recv(4096))#max of 4096 bytes, if longer get chunk
+            if chunk == "":
+                #connection to Arduino was lost
+                log.info("Arduino has disconnected from daemon")
+                break
+            data = data + chunk
+            while "\n" in data:
+                i = data.find("\n")
+                command = data[0:i]
+                handleArduinoCommand(self, data[0:i])
+                data = data[i + 1:]
+            log.info("Data Received from %s: %s" % (self.addr, data))
 
 if _USESERIAL: #Start a serial port reader
     serial = SerialReader();
+    serial.start()#starts a new thread
 
 #Grab onto the socket
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
