@@ -23,7 +23,7 @@ import socket
 import sys
 import threading
 from serial.serialutil import SerialException
-from threading import Thread
+#from threading import Thread
 import diagnostic
 
 #Open the com port
@@ -54,7 +54,7 @@ usage: python pather-daemon.py COMMANDS
 
 #Handle logging
 dir = __file__[:-9]
-LOG_FILENAME = '%s/log/pather-daemon.log' % dir
+LOG_FILENAME = '%slog/pather-daemon.log' % dir
 log = logging.getLogger('pather-daemon')
 log.setLevel(logging.DEBUG)
 
@@ -138,8 +138,8 @@ class ClientRead(threading.Thread):
                 log.info("Client has disconnected from daemon")
                 break
             data = data + chunk
-            while "!" in data: #Messages must be deliminated by a "!"
-                i = data.find("!")#the !'s should now be \n's for this line and previos line
+            while "\n" in data: 
+                i = data.find("\n")
                 command = data[0:i]
                 if command == "CLOSE":
                     self.socket.shutdown(socket.SHUT_RDWR)
@@ -187,4 +187,4 @@ while True:#waits for ppl to connect
     (clientsocket, address) = server.accept()
     log.info("Connection made from %s" % address)
     ClientRead(clientsocket, address).start()
-    
+   
