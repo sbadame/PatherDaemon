@@ -53,7 +53,8 @@ usage: python pather-daemon.py COMMANDS
 ''' % (_port, _hostname, _serialport))
 
 #Handle logging
-LOG_FILENAME = 'log/pather-daemon.log'
+dir = __file__[:-9]
+LOG_FILENAME = '%s/log/pather-daemon.log' % dir
 log = logging.getLogger('pather-daemon')
 log.setLevel(logging.DEBUG)
 
