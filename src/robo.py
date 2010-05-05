@@ -23,21 +23,24 @@ lock = threading.Lock()
 
 def turnonmotors():
     lock.acquire()
+    print("on Aqui")
     #Turn on Motor 1
-    ser.write("~PO041V\n")
-    ser.write("~PO050V\n")
+    ser.write("~PO041V")
+    ser.write("~PO050V")
 
     #Turn on Motor 2
-    ser.write("~PO120V\n")
-    ser.write("~PO131V\n")
+    ser.write("~PO120V")
+    ser.write("~PO131V")
 
     ramp = "rampup"
 
     ser.flush()
+    print("on release")
     lock.release()
 
 def turnoffmotors():
     lock.acquire()
+    print("off aq")
     #Turn off Motor 1
     ser.write("~PO040V\n")
     ser.write("~PO050V\n")
@@ -47,6 +50,7 @@ def turnoffmotors():
     ser.write("~PO130V\n")
 
     ser.flush()
+    print("off rel")
     lock.release()
 
 def turn_clockwise():
@@ -110,9 +114,11 @@ def ramper():
         strpwm = str(pwm) if pwm >= 10 else "0"+str(pwm)
 
         lock.acquire()
-        ser.write("~PW09%s\n" % strpwm)
-        ser.write("~PW10%s\n" % strpwm)
+        print("ramp Aqui")
+        ser.write("~PM09%s" % strpwm)
+        ser.write("~PM10%s" % strpwm)
         ser.flush()
+        print("ramp Rel")
         lock.release()
 
         if pwm == slowestspeed or pwm == 100:
@@ -123,9 +129,10 @@ def ramper():
 
 
 def readInfo():
-        global portopen
+        global portopen,odo,heading,prox
         data = ""
         while portopen:
+            print("reading info")
             info = ser.readline()
             if info.startswith("odo"):
                 print("Got odo command: %s" % info)
@@ -136,6 +143,8 @@ def readInfo():
                 heading = float(info.split(" ")[2])
             elif info == "\n" or info.startswith("Ufa"):
                 pass
+            elif info.startswith("echo"):
+                print("Got message: %s" % info.split(" ", 1)[1])
             else:
                 portopen = False
                 raise Exception("Ardruino threw some crazy garbage at us: \"%s\"" % info)
