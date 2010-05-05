@@ -1,7 +1,7 @@
 import serial
 import threading
 import time
-import Lock
+import threading 
 
 #Needs to be calibrated
 pollingtime = 0.5
@@ -17,10 +17,14 @@ portopen = True
 
 #Current PWM amount
 ramp = "donothing"
-pwm = 0
+pwm = 3
+
+#De lock
+lock = threading.Lock()
+
 
 def turnonmotors():
-    Lock.acquire()
+    lock.acquire()
     #Turn on Motor 1
     ser.write("~PO041V\n")
     ser.write("~PO050V\n")
@@ -32,10 +36,10 @@ def turnonmotors():
     ramp = "rampup"
 
     ser.flush()
-    Lock.release()
+    lock.release()
 
 def turnoffmotors():
-    Lock.acquire()
+    lock.acquire()
     #Turn off Motor 1
     ser.write("~PO040V\n")
     ser.write("~PO050V\n")
@@ -45,7 +49,7 @@ def turnoffmotors():
     ser.write("~PO130V\n")
 
     ser.flush()
-    Lock.release()
+    lock.release()
 
 def turn_clockwise():
     ramp = "donothing"
@@ -83,6 +87,7 @@ def move(ticks):
     start = odo
     turnonmotors()
     while odo < start + ticks:
+	#print("odo: %d" % odo)
         if ((start + ticks) - odo) < 20 and ramp != "rampdown":
             ramp = "rampdown"
         time.sleep(pollingtime)
@@ -105,11 +110,11 @@ def ramper():
 
         strpwm = str(pwm) if pwm >= 10 else "0"+str(pwm)
 
-        Lock.acquire()
+        lock.acquire()
         ser.write("~PW09%s\n" % strpwm)
         ser.write("~PW10%s\n" % strpwm)
         ser.flush()
-        Lock.release()
+        lock.release()
 
         if pwm == slowestspeed or pwm == 100:
             ramp = "donothing"
@@ -124,31 +129,28 @@ def readInfo():
         while portopen:
             info = ser.readline()
             if info.startswith("odo"):
+		print("Got odo command: %s" % info)
                 odo = int(info[3:])
             elif info.startswith("ad"):
                 prox = int(info[2:])
             elif info.startswith("Current heading:"):
-                heading = float(info[len("Current heading:"):])
+                heading = float(info.split(" ")[2])
+	    elif info == "\n" or info.startswith("Ufa"):
+		pass
             else:
                 portopen = False
-                raise Exception("Ardruino threw some crazy garbage at us")
+                raise Exception("Ardruino threw some crazy garbage at us: \"%s\"" % info)
 
 def connect(where="/dev/tty.usbserial"):
+    global ser
     ser = serial.Serial(where, 9600)
     threading.Thread(target=readInfo).start()
 
 if __name__ == "__main__":
-    usbname = input("What is the name of the usb port?")
-    connect(usbname)
-    print("""
-Try the following commands:
-    face [angle]
-    move [ticks]
-    
-    """)
-
+    connect("/dev/ttyUSB0")
     while True:
-        com = input("Command:")
+        com = raw_input("Command:")
+        print(com)
         if com.startswith("face"):
             angle = int(com.split(" ")[1])
             faceangle(angle)
