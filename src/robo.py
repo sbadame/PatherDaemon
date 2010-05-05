@@ -125,7 +125,7 @@ def ramper():
             ramp = "donothing"
 
         if pwm < 5 or pwm > 100:
-            raise Exception("Son of a mother took off on us, PWM = %d" % pwm)
+            raise Exception("Son of a mother took off on us, I'll throw an Exception at him! PWM = %d" % pwm)
 
 
 def readInfo():
