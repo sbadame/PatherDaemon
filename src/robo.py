@@ -26,8 +26,8 @@ def turnonmotors():
     ser.write("~PO050V\n")
 
     #Turn on Motor 2
-    ser.write("~PO121V\n")
-    ser.write("~PO130V\n")
+    ser.write("~PO120V\n")
+    ser.write("~PO131V\n")
 
     ramp = "rampup"
 
@@ -55,8 +55,8 @@ def turn_clockwise():
     ser.write("~PO051V\n")
 
     #Forwards Motor 2
-    ser.write("~PO121V\n")
-    ser.write("~PO130V\n")
+    ser.write("~PO120V\n")
+    ser.write("~PO131V\n")
 
     ser.flush()
 
@@ -69,8 +69,8 @@ def turn_counterclockwise():
     ser.write("~PO050V\n")
 
     #Reverse Motor 2
-    ser.write("~PO120V\n")
-    ser.write("~PO131V\n")
+    ser.write("~PO121V\n")
+    ser.write("~PO130V\n")
 
     ser.flush()
 
@@ -106,8 +106,8 @@ def ramper():
         strpwm = str(pwm) if pwm >= 10 else "0"+str(pwm)
 
         Lock.acquire()
-        ser.write("~PW02%s\n" % strpwm)
-        ser.write("~PW02%s\n" % strpwm)
+        ser.write("~PW09%s\n" % strpwm)
+        ser.write("~PW10%s\n" % strpwm)
         ser.flush()
         Lock.release()
 
