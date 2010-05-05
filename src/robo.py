@@ -1,7 +1,6 @@
 import serial
 import threading
 import time
-import threading 
 
 #Needs to be calibrated
 pollingtime = 0.5
@@ -21,7 +20,6 @@ pwm = 3
 
 #De lock
 lock = threading.Lock()
-
 
 def turnonmotors():
     lock.acquire()
@@ -87,7 +85,7 @@ def move(ticks):
     start = odo
     turnonmotors()
     while odo < start + ticks:
-	#print("odo: %d" % odo)
+        #print("odo: %d" % odo)
         if ((start + ticks) - odo) < 20 and ramp != "rampdown":
             ramp = "rampdown"
         time.sleep(pollingtime)
@@ -96,6 +94,7 @@ def move(ticks):
 def ramper():
     global pwm, ramp
     while portopen:
+        time.sleep(pollingtime)
         if ramp == "rampup":
             pwm += 3
         elif ramp == "rampdown":
@@ -129,14 +128,14 @@ def readInfo():
         while portopen:
             info = ser.readline()
             if info.startswith("odo"):
-		print("Got odo command: %s" % info)
+                print("Got odo command: %s" % info)
                 odo = int(info[3:])
             elif info.startswith("ad"):
                 prox = int(info[2:])
             elif info.startswith("Current heading:"):
                 heading = float(info.split(" ")[2])
-	    elif info == "\n" or info.startswith("Ufa"):
-		pass
+            elif info == "\n" or info.startswith("Ufa"):
+                pass
             else:
                 portopen = False
                 raise Exception("Ardruino threw some crazy garbage at us: \"%s\"" % info)
@@ -145,6 +144,7 @@ def connect(where="/dev/tty.usbserial"):
     global ser
     ser = serial.Serial(where, 9600)
     threading.Thread(target=readInfo).start()
+    threading.Thread(target=ramper).start()
 
 if __name__ == "__main__":
     connect("/dev/ttyUSB0")
