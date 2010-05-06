@@ -5,7 +5,8 @@ import time
 #Needs to be calibrated
 pollingtime = 0.5
 headingaccuracy = 5
-slowestspeed = 5
+slowestspeed = 30
+hispeed = 90
 
 #This will hold the connection to the arduino
 ser = None
@@ -15,139 +16,180 @@ heading = 0
 portopen = True
 
 #Current PWM amount
-ramp = "donothing"
-pwm = 3
+donothing = 0
+rampup = 1
+rampdown = 2
+ramp = donothing
+pwm = slowestspeed
 
 #De lock
 lock = threading.Lock()
 
 def turnonmotors():
+    global ramp
     lock.acquire()
-    print("on Aqui")
+    print("Turning on motors")
+    ramp = rampup
+
     #Turn on Motor 1
     ser.write("~PO041V")
+    ser.flush()
     ser.write("~PO050V")
+    ser.flush()
 
     #Turn on Motor 2
     ser.write("~PO120V")
-    ser.write("~PO131V")
-
-    ramp = "rampup"
-
     ser.flush()
-    print("on release")
+    ser.write("~PO131V")
+    ser.flush()
     lock.release()
+
 
 def turnoffmotors():
     lock.acquire()
-    print("off aq")
+    global ramp,pwm
+    ramp = donothing
+    pwm = slowestspeed
     #Turn off Motor 1
-    ser.write("~PO040V\n")
-    ser.write("~PO050V\n")
+    ser.write("~PO040V")
+    ser.flush()
+    ser.write("~PO050V")
+    ser.flush()
 
     #Turn off Motor 2
-    ser.write("~PO120V\n")
-    ser.write("~PO130V\n")
-
+    ser.write("~PO120V")
     ser.flush()
-    print("off rel")
+    ser.write("~PO130V")
+    ser.flush()
+
     lock.release()
 
-def turn_clockwise():
-    ramp = "donothing"
+def stop():
+    turnoffmotors()
 
+def turn_clockwise():
+    lock.acquire()
+
+    global ramp
+    ramp = donothing
     #Reverse Motor 1
-    ser.write("~PO040V\n")
-    ser.write("~PO051V\n")
+    ser.write("~PO040V")
+    ser.flush()
+    ser.write("~PO051V")
+    ser.flush()
 
     #Forwards Motor 2
-    ser.write("~PO120V\n")
-    ser.write("~PO131V\n")
-
+    ser.write("~PO120V")
     ser.flush()
+    ser.write("~PO131V")
+    ser.flush()
+
+    #Turn on pulse width
+    ser.write("~PM0950")
+    ser.flush()
+
+    lock.release()
 
 
 def turn_counterclockwise():
-    ramp = "donothing"
+    lock.acquire()
+    global ramp
+    ramp = donothing
 
     #Forwards Motor 1
-    ser.write("~PO041V\n")
-    ser.write("~PO050V\n")
-
-    #Reverse Motor 2
-    ser.write("~PO121V\n")
-    ser.write("~PO130V\n")
-
+    ser.write("~PO041V")
+    ser.flush()
+    ser.write("~PO050V")
     ser.flush()
 
+    #Reverse Motor 2
+    ser.write("~PO121V")
+    ser.flush()
+    ser.write("~PO130V")
+    ser.flush()
+
+    ser.write("~PM0950")
+    ser.flush()
+
+    lock.release()
+
 def faceangle(angle):
+    turn_clockwise()
     while abs(angle-heading) > headingaccuracy:
-        turn_clockwise()
+        print("Aiming for %s, currently facing %s" % (angle, heading))
+        time.sleep(0.5)
+    turnoffmotors()
 
 def move(ticks):
     global ramp
     start = odo
+    end = odo + ticks
     turnonmotors()
-    while odo < start + ticks:
-        #print("odo: %d" % odo)
-        if ((start + ticks) - odo) < 20 and ramp != "rampdown":
-            ramp = "rampdown"
+    #print("Starting to move from %d to %d" % (start,end))
+    while odo < end:
+        print("odo at : " + str(odo) )
+        if (end - odo) < 20 and ramp != rampdown:
+            ramp = rampdown
         time.sleep(pollingtime)
+    #print("Done with loop")
     turnoffmotors()
 
 def ramper():
     global pwm, ramp
     while portopen:
-        time.sleep(pollingtime)
-        if ramp == "rampup":
+        lock.acquire()
+        if ramp == rampup:
             pwm += 3
-        elif ramp == "rampdown":
+        elif ramp == rampdown:
             pwm -= 3
-        elif ramp == "donothing":
+        elif ramp == donothing:
+            lock.release()
             continue
         else:
-            raise Exception("bad value for ramp: %s" % ramp)
+            lock.release()
+            raise Exception("bad value for ramp: \"%s\"" % ramp)
 
-        pwm = pwm if pwm > slowestspeed else slowestspeed
-        pwm = pwm if pwm < 100 else 100
+        time.sleep(pollingtime)
+        if pwm <= slowestspeed:
+            pwm = slowestspeed
+        if pwm >= hispeed:
+            pwm = hispeed
 
-        strpwm = str(pwm) if pwm >= 10 else "0"+str(pwm)
-
-        lock.acquire()
-        print("ramp Aqui")
-        ser.write("~PM09%s" % strpwm)
-        ser.write("~PM10%s" % strpwm)
+        rmpmsg09 = "~PM09" + str(pwm)
+        #rmpmsg10 = "~PM10" + str(pwm)
+        #print("Sending: " + rmpmsg09)
+        #print("Sending: " + rmpmsg10)
+        #ser.write(rmpmsg10)
+        ser.write(rmpmsg09)
         ser.flush()
-        print("ramp Rel")
-        lock.release()
 
-        if pwm == slowestspeed or pwm == 100:
-            ramp = "donothing"
+        if pwm <= slowestspeed or pwm >= hispeed:
+            ramp = donothing
 
-        if pwm < 5 or pwm > 100:
+        if pwm < slowestspeed or pwm > hispeed:
             raise Exception("Son of a mother took off on us, I'll throw an Exception at him! PWM = %d" % pwm)
+        lock.release()
+        time.sleep(pollingtime)
 
 
 def readInfo():
         global portopen,odo,heading,prox
         data = ""
         while portopen:
-            print("reading info")
             info = ser.readline()
+            #print("read in: " + info)
             if info.startswith("odo"):
-                print("Got odo command: %s" % info)
                 odo = int(info[3:])
             elif info.startswith("ad"):
                 prox = int(info[2:])
-            elif info.startswith("Current heading:"):
+            elif info.startswith("Current"):
                 heading = float(info.split(" ")[2])
+            elif info.startswith("echo"):
+                print(info)
             elif info == "\n" or info.startswith("Ufa"):
                 pass
-            elif info.startswith("echo"):
-                print("Got message: %s" % info.split(" ", 1)[1])
             else:
-                portopen = False
-                raise Exception("Ardruino threw some crazy garbage at us: \"%s\"" % info)
+                print("Ardruino threw some crazy garbage at us: \"%s\"" % info)
 
 def connect(where="/dev/tty.usbserial"):
     global ser
@@ -159,12 +201,26 @@ if __name__ == "__main__":
     connect("/dev/ttyUSB0")
     while True:
         com = raw_input("Command:")
-        print(com)
-        if com.startswith("face"):
+        if com.isspace():
+            continue
+        elif com.startswith("face"):
             angle = int(com.split(" ")[1])
             faceangle(angle)
         elif com.startswith("move"):
             ticks = int(com.split(" ")[1])
             move(ticks)
+        elif com.startswith("on"):
+            turnonmotors()
+        elif com.startswith("off"):
+            turnoffmotors()
+        elif com.startswith("cw"):
+            turn_clockwise()
+        elif com.startswith("ccw"):
+            turn_counterclockwise()
+	elif com.startswith("stop"):
+	    stop()
+	elif com.startswith("exit"):
+	    stop()
+	    exit()
         else:
             print("Sorry buddy, that's not a command: %s" % com)
