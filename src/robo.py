@@ -11,6 +11,9 @@ pollingtime = 0.5
 headingaccuracy = 5
 slowestspeed = 30
 hispeed = 90
+rampupspeed = 5
+rampdownspeed = 5
+rampollingtime = 0.2
 
 #This will hold the connection to the arduino
 ser = None
@@ -52,10 +55,18 @@ def turnonmotors():
 
 def __go(ID=0):
     with commandlock:
+        global ramp
         commanddict[ID] = True
         turnonmotors()
         while commanddict[ID] == True:
             time.sleep(pollingtime)
+
+        if ramp == donothing:
+            ramp = rampdown
+
+        while ramp != donothing:
+            time.sleep(pollingtime)
+
         turnoffmotors()
 
 def go(ID=0):
@@ -101,7 +112,7 @@ def turn_clockwise():
         ser.flush()
 
         #Turn on pulse width
-        ser.write("~PM0950")
+        ser.write("~PM09" + str(slowestspeed) )
         ser.flush()
 
 
@@ -122,7 +133,7 @@ def turn_counterclockwise():
         ser.write("~PO130V")
         ser.flush()
 
-        ser.write("~PM0950")
+        ser.write("~PM09" + str(slowestspeed) )
         ser.flush()
 
 def __cw(ID=0):
@@ -205,39 +216,35 @@ def cancel(ID):
 def ramper():
     global pwm, ramp
     while portopen:
-        seriallock.acquire()
-        if ramp == rampup:
-            pwm += 3
-        elif ramp == rampdown:
-            pwm -= 3
-        elif ramp == donothing:
-            seriallock.release()
-            continue
-        else:
-            seriallock.release()
-            raise Exception("bad value for ramp: \"%s\"" % ramp)
+        with seriallock:
+            if ramp == rampup:
+                pwm += rampupspeed
+            elif ramp == rampdown:
+                pwm -= rampupspeed
+            elif ramp == donothing:
+                continue
+            else:
+                raise Exception("bad value for ramp: \"%s\"" % ramp)
 
-        time.sleep(pollingtime)
-        if pwm <= slowestspeed:
-            pwm = slowestspeed
-        if pwm >= hispeed:
-            pwm = hispeed
+            time.sleep(rampollingtime)
+            if pwm <= slowestspeed:
+                pwm = slowestspeed
+            if pwm >= hispeed:
+                pwm = hispeed
 
-        rmpmsg09 = "~PM09" + str(pwm)
-        #rmpmsg10 = "~PM10" + str(pwm)
-        #print("Sending: " + rmpmsg09)
-        #print("Sending: " + rmpmsg10)
-        #ser.write(rmpmsg10)
-        ser.write(rmpmsg09)
-        ser.flush()
+            rmpmsg09 = "~PM09" + str(pwm)
+            #rmpmsg10 = "~PM10" + str(pwm)
+            #print("Sending: " + rmpmsg09)
+            #print("Sending: " + rmpmsg10)
+            #ser.write(rmpmsg10)
+            ser.write(rmpmsg09)
+            ser.flush()
 
-        if pwm <= slowestspeed or pwm >= hispeed:
-            ramp = donothing
+            if pwm <= slowestspeed or pwm >= hispeed:
+                ramp = donothing
 
-        if pwm < slowestspeed or pwm > hispeed:
-            raise Exception("Son of a mother took off on us, I'll throw an Exception at him! PWM = %d" % pwm)
-        seriallock.release()
-        time.sleep(pollingtime)
+            if pwm < slowestspeed or pwm > hispeed:
+                raise Exception("Son of a mother took off on us, I'll throw an Exception at him! PWM = %d" % pwm)
 
 def readInfo():
         global portopen,odo,heading,prox
