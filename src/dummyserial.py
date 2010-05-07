@@ -1,10 +1,8 @@
-class DummySerial:
+def write(msg):
+	print("dummyserial.py " + msg)
 
-    def write(msg):
-        print("dummyserial.py " + msg)
+def flush():
+	pass
 
-    def flush():
-        pass
-
-    def readline():
-        pass
+def readline():
+	return "Ufa"
