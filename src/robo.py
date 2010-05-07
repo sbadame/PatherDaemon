@@ -1,6 +1,10 @@
 import serial
 import threading
 import time
+import dummyserial
+import dummyclient
+
+clientport = dummyclient
 
 #Needs to be calibrated
 pollingtime = 0.5
@@ -22,12 +26,16 @@ rampdown = 2
 ramp = donothing
 pwm = slowestspeed
 
-#De lock
-lock = threading.Lock()
+#De seriallock
+seriallock = threading.Lock()
+commandlock = threading.Lock()
+
+#dictionary of commands
+commanddict = {}
 
 def turnonmotors():
     global ramp
-    lock.acquire()
+    seriallock.acquire()
     print("Turning on motors")
     ramp = rampup
 
@@ -42,11 +50,10 @@ def turnonmotors():
     ser.flush()
     ser.write("~PO131V")
     ser.flush()
-    lock.release()
-
+    seriallock.release()
 
 def turnoffmotors():
-    lock.acquire()
+    seriallock.acquire()
     global ramp,pwm
     ramp = donothing
     pwm = slowestspeed
@@ -62,13 +69,13 @@ def turnoffmotors():
     ser.write("~PO130V")
     ser.flush()
 
-    lock.release()
+    seriallock.release()
 
 def stop():
     turnoffmotors()
 
 def turn_clockwise():
-    lock.acquire()
+    seriallock.acquire()
 
     global ramp
     ramp = donothing
@@ -88,11 +95,10 @@ def turn_clockwise():
     ser.write("~PM0950")
     ser.flush()
 
-    lock.release()
-
+    seriallock.release()
 
 def turn_counterclockwise():
-    lock.acquire()
+    seriallock.acquire()
     global ramp
     ramp = donothing
 
@@ -111,42 +117,67 @@ def turn_counterclockwise():
     ser.write("~PM0950")
     ser.flush()
 
-    lock.release()
+    seriallock.release()
 
-def faceangle(angle):
+def __faceangle(angle,ID=0):
+    commandlock.acquire()
+    global commanddict
+    commanddict[ID]=True
     turn_clockwise()
-    while abs(angle-heading) > headingaccuracy:
+    while abs(angle-heading) > headingaccuracy and commanddict[ID] == True:
         print("Aiming for %s, currently facing %s" % (angle, heading))
         time.sleep(0.5)
     turnoffmotors()
+    clientport.sendall("Success," + str(ID))
+    commandlock.release()
 
-def move(ticks):
-    global ramp
+def faceangle(angle,ID=0):
+    if commandlock.locked():
+        clientport.sendall("Busy," + str(ID))
+    else:
+        threading.Thread(target=__faceangle,args=(angle,ID)).start()
+
+def __move(ticks,ID=0):
+    commandlock.acquire()
+    global ramp, commanddict
+    commanddict[ID]=True
     start = odo
     end = odo + ticks
     turnonmotors()
     #print("Starting to move from %d to %d" % (start,end))
-    while odo < end:
+    while odo < end and commanddict[ID] == True:
         print("odo at : " + str(odo) )
         if (end - odo) < 20 and ramp != rampdown:
             ramp = rampdown
         time.sleep(pollingtime)
     #print("Done with loop")
     turnoffmotors()
+    clientport.sendall("Success," + str(ID))
+    commandlock.release()
+
+def move(ticks,ID=0):
+    if commandlock.locked():
+        clientport.sendall("Busy" + str(ID))
+    else:
+        threading.Thread(target=__move,args=(ticks,ID)).start()
+
+def cancel(ID):
+    global commanddict
+    commanddict[ID] = False
 
 def ramper():
     global pwm, ramp
     while portopen:
-        lock.acquire()
+        seriallock.acquire()
         if ramp == rampup:
             pwm += 3
         elif ramp == rampdown:
             pwm -= 3
         elif ramp == donothing:
-            lock.release()
+            seriallock.release()
             continue
         else:
-            lock.release()
+            seriallock.release()
             raise Exception("bad value for ramp: \"%s\"" % ramp)
 
         time.sleep(pollingtime)
@@ -168,9 +199,8 @@ def ramper():
 
         if pwm < slowestspeed or pwm > hispeed:
             raise Exception("Son of a mother took off on us, I'll throw an Exception at him! PWM = %d" % pwm)
-        lock.release()
+        seriallock.release()
         time.sleep(pollingtime)
-
 
 def readInfo():
         global portopen,odo,heading,prox
@@ -191,9 +221,12 @@ def readInfo():
             else:
                 print("Ardruino threw some crazy garbage at us: \"%s\"" % info)
 
-def connect(where="/dev/tty.usbserial"):
+def connect(where="/dev/ttyUSB0", useserial=True):
     global ser
-    ser = serial.Serial(where, 9600)
+    if useserial == True:
+        ser = serial.Serial(where, 9600)
+    else:
+        ser = dummyserial
     threading.Thread(target=readInfo).start()
     threading.Thread(target=ramper).start()
 
@@ -205,10 +238,10 @@ if __name__ == "__main__":
             continue
         elif com.startswith("face"):
             angle = int(com.split(" ")[1])
-            faceangle(angle)
+            __faceangle(angle)
         elif com.startswith("move"):
             ticks = int(com.split(" ")[1])
-            move(ticks)
+            __move(ticks)
         elif com.startswith("on"):
             turnonmotors()
         elif com.startswith("off"):

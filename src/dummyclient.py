@@ -1,0 +1,2 @@
+def sendall(string):
+    pass

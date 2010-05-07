@@ -1,10 +1,7 @@
-
-
-
 class DummySerial:
 
     def write(msg):
-        print("Message Received: %s" % msg)
+        print("dummyserial.py " + msg)
 
     def flush():
         pass
