@@ -34,102 +34,139 @@ commandlock = threading.Lock()
 commanddict = {}
 
 def turnonmotors():
-    global ramp
-    seriallock.acquire()
-    print("Turning on motors")
-    ramp = rampup
+    with seriallock:
+        global ramp
+        ramp = rampup
 
-    #Turn on Motor 1
-    ser.write("~PO041V")
-    ser.flush()
-    ser.write("~PO050V")
-    ser.flush()
+        #Turn on Motor 1
+        ser.write("~PO041V")
+        ser.flush()
+        ser.write("~PO050V")
+        ser.flush()
 
-    #Turn on Motor 2
-    ser.write("~PO120V")
-    ser.flush()
-    ser.write("~PO131V")
-    ser.flush()
-    seriallock.release()
+        #Turn on Motor 2
+        ser.write("~PO120V")
+        ser.flush()
+        ser.write("~PO131V")
+        ser.flush()
+
+def __go(ID=0):
+    with commandlock:
+        commanddict[ID] = True
+        turnonmotors()
+        while commanddict[ID] == True:
+            time.sleep(pollingtime)
+        turnoffmotors()
+
+def go(ID=0):
+    if commandlock.locked():
+        clientport.sendall("Busy,"+str(ID))
+    else:
+        threading.Thread(target=__go, args=(ID,)).start()
 
 def turnoffmotors():
-    seriallock.acquire()
-    global ramp,pwm
-    ramp = donothing
-    pwm = slowestspeed
-    #Turn off Motor 1
-    ser.write("~PO040V")
-    ser.flush()
-    ser.write("~PO050V")
-    ser.flush()
+    with seriallock:
+        global ramp,pwm
+        ramp = donothing
+        pwm = slowestspeed
+        #Turn off Motor 1
+        ser.write("~PO040V")
+        ser.flush()
+        ser.write("~PO050V")
+        ser.flush()
 
-    #Turn off Motor 2
-    ser.write("~PO120V")
-    ser.flush()
-    ser.write("~PO130V")
-    ser.flush()
-
-    seriallock.release()
+        #Turn off Motor 2
+        ser.write("~PO120V")
+        ser.flush()
+        ser.write("~PO130V")
+        ser.flush()
 
 def stop():
     turnoffmotors()
 
 def turn_clockwise():
-    seriallock.acquire()
+    with seriallock:
+        global ramp
+        ramp = donothing
+        #Reverse Motor 1
+        ser.write("~PO040V")
+        ser.flush()
+        ser.write("~PO051V")
+        ser.flush()
 
-    global ramp
-    ramp = donothing
-    #Reverse Motor 1
-    ser.write("~PO040V")
-    ser.flush()
-    ser.write("~PO051V")
-    ser.flush()
+        #Forwards Motor 2
+        ser.write("~PO120V")
+        ser.flush()
+        ser.write("~PO131V")
+        ser.flush()
 
-    #Forwards Motor 2
-    ser.write("~PO120V")
-    ser.flush()
-    ser.write("~PO131V")
-    ser.flush()
+        #Turn on pulse width
+        ser.write("~PM0950")
+        ser.flush()
 
-    #Turn on pulse width
-    ser.write("~PM0950")
-    ser.flush()
-
-    seriallock.release()
 
 def turn_counterclockwise():
-    seriallock.acquire()
-    global ramp
-    ramp = donothing
+    with seriallock:
+        global ramp
+        ramp = donothing
 
-    #Forwards Motor 1
-    ser.write("~PO041V")
-    ser.flush()
-    ser.write("~PO050V")
-    ser.flush()
+        #Forwards Motor 1
+        ser.write("~PO041V")
+        ser.flush()
+        ser.write("~PO050V")
+        ser.flush()
 
-    #Reverse Motor 2
-    ser.write("~PO121V")
-    ser.flush()
-    ser.write("~PO130V")
-    ser.flush()
+        #Reverse Motor 2
+        ser.write("~PO121V")
+        ser.flush()
+        ser.write("~PO130V")
+        ser.flush()
 
-    ser.write("~PM0950")
-    ser.flush()
+        ser.write("~PM0950")
+        ser.flush()
 
-    seriallock.release()
+def __cw(ID=0):
+    with commandlock:
+        commanddict[ID] = True
+        turn_clockwise()
+        while commanddict[ID] == True:
+            time.sleep(pollingtime)
+        stop()
+
+def cw(ID=0):
+    print("going to cw")
+    if commandlock.locked():
+        clientport.sendall("Busy," + str(ID))
+    else:
+        print("unlocked")
+        threading.Thread(target=__cw, args=(ID,)).start()
+
+
+def __ccw(ID=0):
+    with commandlock:
+        commanddict[ID] = True
+        turn_counterclockwise()
+        while commanddict[ID] == True:
+            time.sleep(pollingtime)
+        stop()
+
+def ccw(ID=0):
+    if commandlock.locked():
+        clientport.sendall("Busy," + str(ID))
+    else:
+        threading.Thread(target=__ccw, args=(ID,)).start()
+
 
 def __faceangle(angle,ID=0):
-    commandlock.acquire()
-    global commanddict
-    commanddict[ID]=True
-    turn_clockwise()
-    while abs(angle-heading) > headingaccuracy and commanddict[ID] == True:
-        print("Aiming for %s, currently facing %s" % (angle, heading))
-        time.sleep(0.5)
-    turnoffmotors()
-    clientport.sendall("Success," + str(ID))
-    commandlock.release()
+    with commandlock:
+        global commanddict
+        commanddict[ID]=True
+        turn_clockwise()
+        while abs(angle-heading) > headingaccuracy and commanddict[ID] == True:
+            print("Aiming for %s, currently facing %s" % (angle, heading))
+            time.sleep(0.5)
+        turnoffmotors()
+        clientport.sendall("Success," + str(ID))
 
 def faceangle(angle,ID=0):
     if commandlock.locked():
@@ -157,7 +194,7 @@ def __move(ticks,ID=0):
 
 def move(ticks,ID=0):
     if commandlock.locked():
-        clientport.sendall("Busy" + str(ID))
+        clientport.sendall("Busy," + str(ID))
     else:
         threading.Thread(target=__move,args=(ticks,ID)).start()
 

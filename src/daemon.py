@@ -110,8 +110,9 @@ except:
 server.listen(0)
 log.info("Listening to port %d for clients." % _port)
 
+
 #Start the log diagnostic thread
-diagnostic.startServer()
+threading.Thread(target=diagnostic.startServer).start()
 
 #get info from client
 def read():
@@ -131,6 +132,12 @@ def read():
                 robo.faceangle(int(message.split(",")[1]),int(message.split(",")[2]))
             elif message.startswith("Cancel"):
                 robo.cancel(int(message.split(",")[1]))
+            elif message.startswith("Go"):
+                robo.go(int(message.split(",")[1]))
+            elif message.startswith("CW"):
+                robo.cw(int(message.split(",")[1]))
+            elif message.startswith("CCW"):
+                robo.ccw(int(message.split(",")[1]))
             else:
                 log.info("Bad command:" + message)
         data=data.rpartition("\n")[2]
@@ -141,6 +148,6 @@ def read():
 #begin loop
 while True:#waits for ppl to connect
     (clientsocket, address) = server.accept()
-    log.info("Connection made from %s" % address)
+    log.info("Connection made from %s" % str(address))
     threading.Thread(target=read).start()
     robo.clientport = clientsocket
