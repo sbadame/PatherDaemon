@@ -17,14 +17,12 @@
 import getopt
 import logging.handlers
 
+import threading
 import os
-import serial
 import socket
 import sys
-import threading
-from serial.serialutil import SerialException
-from threading import Thread
 import diagnostic
+import robo
 
 #Open the com port
 _serialport = ""
@@ -53,7 +51,8 @@ usage: python pather-daemon.py COMMANDS
 ''' % (_port, _hostname, _serialport))
 
 #Handle logging
-LOG_FILENAME = 'log/pather-daemon.log'
+dir = __file__[:-9]
+LOG_FILENAME = '%slog/pather-daemon.log' % dir
 log = logging.getLogger('pather-daemon')
 log.setLevel(logging.DEBUG)
 
@@ -95,76 +94,9 @@ for opt, args in opts:
     elif opt in ("-s", "--serial"):
             _serialport = args
     log.info("-s option detected, using port=%s" % _serialport);
-    
 
-#Grab the parallel port and clear it
-patherport = None
-if _USESERIAL:
-    try:
-        patherport = serial.Serial(_serialport);
-    except SerialException:
-        patherport = None
-        _USESERIAL = False
-        log.info("ERROR: port %s could not be opened, defaulting to -X mode" % _serialport)
-        
-def handleCommand(command):
-    global log
-    log.info("Command Sent: %s" % command)
-    if patherport != None:
-        patherport.write(command)
-
-#Emergency stop command for the pather
-def STOP_BOT():
-    handleCommand("PW,0,0")
-    handleCommand("PW,1,0")
-
-#This is done both to reset the pins and confirm that everything is working.
-STOP_BOT()
-
-class ClientRead(threading.Thread):
-    def __init__(self, socket, addr):
-        Thread.__init__(self)
-        self.socket = socket
-        self.addr = addr
-    
-    def run(self):
-        data = ""
-        while True:
-            chunk = str(self.socket.recv(4096))
-            if chunk == "":
-                #Uh oh this isn't supposed to happen!
-                STOP_BOT()
-                log.info("Client has disconnected from daemon")
-                break
-            data = data + chunk
-            while "!" in data: #Messages must be deliminated by a "!"
-                i = data.find("!")
-                command = data[0:i]
-                if command == "CLOSE":
-                    self.socket.shutdown(socket.SHUT_RDWR)
-                    self.socket.close()
-                    break
-                else:
-                    handleCommand(self, data[0:i])
-                data = data[i + 1:]
-                
-            log.info("Data Received from %s: %s" % (self.addr, data))
-
-    def notifyCommandSent(self, command):
-        self.socket.sendAll("Command: %s" % command)
-        
-# Class that is responsible to read info from the UBW32
-class SerialReader(threading.Thread):
-    
-    def __init__(self, serial):
-        self.serial = serial
-    
-    def run(self):
-        for response in self.serial:
-            log.info("Received response: %s" % response)
-
-if _USESERIAL: #Start a serial port reader
-    serial = SerialReader();
+#connect to Arduino here
+robo.connect(_serialport, _USESERIAL)
 
 #Grab onto the socket
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -178,12 +110,44 @@ except:
 server.listen(0)
 log.info("Listening to port %d for clients." % _port)
 
+
 #Start the log diagnostic thread
-diagnostic.startServer()
+threading.Thread(target=diagnostic.startServer).start()
+
+#get info from client
+def read():
+    data = ""
+    while True:
+        data += clientsocket.recv(4096)
+        if not data:
+            break
+        #see if we can remove parts of data
+        messagecount = data.count('\n')
+        splitted = data.split("\n")
+        for i in range(messagecount):
+            message = splitted[i]
+            if message.startswith("Move"):
+                robo.move(int(message.split(",")[1]),int(message.split(",")[2]))
+            elif message.startswith("Face"):
+                robo.faceangle(int(message.split(",")[1]),int(message.split(",")[2]))
+            elif message.startswith("Cancel"):
+                robo.cancel(int(message.split(",")[1]))
+            elif message.startswith("Go"):
+                robo.go(int(message.split(",")[1]))
+            elif message.startswith("CW"):
+                robo.cw(int(message.split(",")[1]))
+            elif message.startswith("CCW"):
+                robo.ccw(int(message.split(",")[1]))
+            else:
+                log.info("Bad command:" + message)
+        data=data.rpartition("\n")[2]
+
+    clientsocket.shutdown(socket.SHUT_RDWR)
+    robo.stop()
 
 #begin loop
-while True:
+while True:#waits for ppl to connect
     (clientsocket, address) = server.accept()
-    log.info("Connection made from %s" % address)
-    ClientRead(clientsocket, address).start()
-    
+    log.info("Connection made from %s" % str(address))
+    threading.Thread(target=read).start()
+    robo.clientport = clientsocket
