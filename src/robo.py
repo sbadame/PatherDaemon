@@ -71,7 +71,7 @@ def __go(ID=0):
 
 def go(ID=0):
     if commandlock.locked():
-        clientport.sendall("Busy,"+str(ID))
+        clientport.sendall( "Busy,%d\n"% (ID) )
     else:
         threading.Thread(target=__go, args=(ID,)).start()
 
@@ -147,7 +147,7 @@ def __cw(ID=0):
 def cw(ID=0):
     print("going to cw")
     if commandlock.locked():
-        clientport.sendall("Busy," + str(ID))
+        clientport.sendall("Busy,%d\n" % (ID))
     else:
         print("unlocked")
         threading.Thread(target=__cw, args=(ID,)).start()
@@ -163,7 +163,7 @@ def __ccw(ID=0):
 
 def ccw(ID=0):
     if commandlock.locked():
-        clientport.sendall("Busy," + str(ID))
+        clientport.sendall("Busy,%d\n" % (ID))
     else:
         threading.Thread(target=__ccw, args=(ID,)).start()
 
@@ -177,11 +177,11 @@ def __faceangle(angle,ID=0):
             print("Aiming for %s, currently facing %s" % (angle, heading))
             time.sleep(0.5)
         turnoffmotors()
-        clientport.sendall("Success," + str(ID))
+        clientport.sendall("Success,%d\n" % (ID))
 
 def faceangle(angle,ID=0):
     if commandlock.locked():
-        clientport.sendall("Busy," + str(ID))
+        clientport.sendall("Busy,%d\n" % (ID))
     else:
         threading.Thread(target=__faceangle,args=(angle,ID)).start()
 
@@ -200,12 +200,12 @@ def __move(ticks,ID=0):
         time.sleep(pollingtime)
     #print("Done with loop")
     turnoffmotors()
-    clientport.sendall("Success," + str(ID))
+    clientport.sendall("Success,%d\n" % (ID))
     commandlock.release()
 
 def move(ticks,ID=0):
     if commandlock.locked():
-        clientport.sendall("Busy," + str(ID))
+        clientport.sendall("Busy,%d\n" % (ID))
     else:
         threading.Thread(target=__move,args=(ticks,ID)).start()
 
@@ -254,10 +254,12 @@ def readInfo():
             #print("read in: " + info)
             if info.startswith("odo"):
                 odo = int(info[3:])
+                clientport.sendall("Odo,%d\n"%(odo))
             elif info.startswith("ad"):
                 prox = int(info[2:])
             elif info.startswith("Current"):
                 heading = float(info.split(" ")[2])
+                clientport.sendall( "Heading,%.2f\n" % (heading) )
             elif info.startswith("echo"):
                 print(info)
             elif info == "\n" or info.startswith("Ufa"):
