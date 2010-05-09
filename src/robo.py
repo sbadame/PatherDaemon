@@ -222,6 +222,9 @@ def __move(ticks,ID=0):
             elif ramp != rampdown and (prox <= rampdowndistance or (end - odo) < 20):
                 with ramplock:
                     ramp = rampdown
+            elif pwm != hispeed and ramp != rampup and prox > rampdowndistance:
+                with ramplock:
+                    ramp = rampup
             time.sleep(pollingtime)
 
         turnoffmotors()
