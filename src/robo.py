@@ -4,6 +4,7 @@ import time
 import dummyserial
 import dummyclient
 
+#When a client connects, it must make sure to set the port
 clientport = dummyclient
 
 #Needs to be calibrated
@@ -14,6 +15,10 @@ hispeed = 90
 rampupspeed = 5
 rampdownspeed = 5
 rampollingtime = 0.2
+
+#Proximity constants
+rampdowndistance = 100
+stopdistance = 50
 
 #This will hold the connection to the arduino
 ser = None
@@ -196,23 +201,31 @@ def faceangle(angle,ID=0):
         threading.Thread(target=__faceangle,args=(angle,ID)).start()
 
 def __move(ticks,ID=0):
-    commandlock.acquire()
-    global ramp, commanddict
-    commanddict[ID]=True
-    start = odo
-    end = odo + ticks
-    turnonmotors()
-    #print("Starting to move from %d to %d" % (start,end))
-    while odo < end and commanddict[ID] == True:
-        #print("odo at : " + str(odo) )
-        if (end - odo) < 20 and ramp != rampdown:
-            with ramplock:
-                ramp = rampdown
-        time.sleep(pollingtime)
-    #print("Done with loop")
-    turnoffmotors()
-    clientport.sendall("Success,%d\n" % (ID))
-    commandlock.release()
+    with commandlock:
+        global ramp, commanddict
+        commanddict[ID]=True
+        start = odo
+        end = odo + ticks
+        turnonmotors()
+
+        blocked = False
+        while odo < end and commanddict[ID] == True:
+
+            if prox <= stopdistance and blocked == False:
+                turnoffmotors()
+                blocked = True
+            elif prox > stopdistance and blocked == True:
+                turnonmotors()
+                with ramplock:
+                    ramp = rampup
+                blocked = False
+            elif ramp != rampdown and (prox <= rampdowndistance or (end - odo) < 20):
+                with ramplock:
+                    ramp = rampdown
+            time.sleep(pollingtime)
+
+        turnoffmotors()
+        clientport.sendall("Success,%d\n" % (ID))
 
 def move(ticks,ID=0):
     if commandlock.locked():
