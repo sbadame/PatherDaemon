@@ -17,8 +17,9 @@ rampdownspeed = 5
 rampollingtime = 0.2
 
 #Proximity constants
-rampdowndistance = 100
-stopdistance = 50
+#Units are 700/1024 = 0.7cm
+rampdowndistance = 100 #100*0.7cm = 70cm
+stopdistance = 50 #50 * 0.7cm = 35cm
 
 #This will hold the connection to the arduino
 ser = None
