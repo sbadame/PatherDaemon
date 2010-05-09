@@ -129,7 +129,7 @@ def read():
             if message.startswith("Move"):
                 robo.move(int(message.split(",")[1]),int(message.split(",")[2]))
             elif message.startswith("Face"):
-                robo.faceangle(int(message.split(",")[1]),int(message.split(",")[2]))
+                robo.faceangle(float(message.split(",")[1]),int(message.split(",")[2]))
             elif message.startswith("Cancel"):
                 robo.cancel(int(message.split(",")[1]))
             elif message.startswith("Go"):

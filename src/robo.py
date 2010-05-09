@@ -24,14 +24,15 @@ portopen = True
 
 #Current PWM amount
 donothing = 0
-rampup = 1
-rampdown = 2
+rampup = 10000
+rampdown = 20000
 ramp = donothing
 pwm = slowestspeed
 
 #De seriallock
 seriallock = threading.Lock()
 commandlock = threading.Lock()
+ramplock = threading.Lock()
 
 #dictionary of commands
 commanddict = {}
@@ -39,7 +40,8 @@ commanddict = {}
 def turnonmotors():
     with seriallock:
         global ramp
-        ramp = rampup
+        with ramplock:
+            ramp = rampup
 
         #Turn on Motor 1
         ser.write("~PO041V")
@@ -62,7 +64,8 @@ def __go(ID=0):
             time.sleep(pollingtime)
 
         if ramp == donothing:
-            ramp = rampdown
+            with ramplock:
+                ramp = rampdown
 
         while ramp != donothing:
             time.sleep(pollingtime)
@@ -78,8 +81,10 @@ def go(ID=0):
 def turnoffmotors():
     with seriallock:
         global ramp,pwm
-        ramp = donothing
-        pwm = slowestspeed
+        with ramplock:
+            ramp = donothing
+            pwm = slowestspeed
+
         #Turn off Motor 1
         ser.write("~PO040V")
         ser.flush()
@@ -93,12 +98,16 @@ def turnoffmotors():
         ser.flush()
 
 def stop():
+    for k in commanddict.keys():
+        commanddict[k] = False
     turnoffmotors()
 
 def turn_clockwise():
     with seriallock:
         global ramp
-        ramp = donothing
+        with ramplock:
+            ramp = donothing
+
         #Reverse Motor 1
         ser.write("~PO040V")
         ser.flush()
@@ -119,7 +128,8 @@ def turn_clockwise():
 def turn_counterclockwise():
     with seriallock:
         global ramp
-        ramp = donothing
+        with ramplock:
+            ramp = donothing
 
         #Forwards Motor 1
         ser.write("~PO041V")
@@ -174,7 +184,7 @@ def __faceangle(angle,ID=0):
         commanddict[ID]=True
         turn_clockwise()
         while abs(angle-heading) > headingaccuracy and commanddict[ID] == True:
-            print("Aiming for %s, currently facing %s" % (angle, heading))
+            #print("Aiming for %s, currently facing %s" % (angle, heading))
             time.sleep(0.5)
         turnoffmotors()
         clientport.sendall("Success,%d\n" % (ID))
@@ -194,9 +204,10 @@ def __move(ticks,ID=0):
     turnonmotors()
     #print("Starting to move from %d to %d" % (start,end))
     while odo < end and commanddict[ID] == True:
-        print("odo at : " + str(odo) )
+        #print("odo at : " + str(odo) )
         if (end - odo) < 20 and ramp != rampdown:
-            ramp = rampdown
+            with ramplock:
+                ramp = rampdown
         time.sleep(pollingtime)
     #print("Done with loop")
     turnoffmotors()
@@ -217,34 +228,34 @@ def ramper():
     global pwm, ramp
     while portopen:
         with seriallock:
-            if ramp == rampup:
-                pwm += rampupspeed
-            elif ramp == rampdown:
-                pwm -= rampupspeed
-            elif ramp == donothing:
-                continue
-            else:
-                raise Exception("bad value for ramp: \"%s\"" % ramp)
+            with ramplock:
+                if ramp == rampup:
+                    pwm += rampupspeed
+                elif ramp == rampdown:
+                    pwm -= rampupspeed
+                elif ramp == donothing:
+                    continue
+                else:
+                    raise Exception("bad value for ramp: \"%s\"" % ramp)
 
             time.sleep(rampollingtime)
-            if pwm <= slowestspeed:
-                pwm = slowestspeed
-            if pwm >= hispeed:
-                pwm = hispeed
+
+            with ramplock:
+                if pwm <= slowestspeed:
+                    pwm = slowestspeed
+                if pwm >= hispeed:
+                    pwm = hispeed
 
             rmpmsg09 = "~PM09" + str(pwm)
-            #rmpmsg10 = "~PM10" + str(pwm)
-            #print("Sending: " + rmpmsg09)
-            #print("Sending: " + rmpmsg10)
-            #ser.write(rmpmsg10)
             ser.write(rmpmsg09)
             ser.flush()
 
-            if pwm <= slowestspeed or pwm >= hispeed:
-                ramp = donothing
+            with ramplock:
+                if pwm <= slowestspeed or pwm >= hispeed:
+                    ramp = donothing
 
-            if pwm < slowestspeed or pwm > hispeed:
-                raise Exception("Son of a mother took off on us, I'll throw an Exception at him! PWM = %d" % pwm)
+                if pwm < slowestspeed or pwm > hispeed:
+                    raise Exception("Son of a mother took off on us, I'll throw an Exception at him! PWM = %d" % pwm)
 
 def readInfo():
         global portopen,odo,heading,prox

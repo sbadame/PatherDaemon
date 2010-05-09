@@ -17,7 +17,7 @@ top = '''
         </script>
     </head>
     <body>
-        <noscript><h1>Warning: Your browser doesn't allow JavaScript, so this log won't be refreshed automatically</h1></noscript>
+        <noscript><h2>Warning: Your browser doesn't allow JavaScript, so this log won't be refreshed automatically</h2></noscript>
 '''
 
 bottom = '''
@@ -36,29 +36,25 @@ def getContent():
 
 
 class LogViewerHTTPHandler(BaseHTTPRequestHandler):
-    
+
     def do_GET(self):
-        try:
-            self.send_response(200)
-            self.send_header('Content-type', 'text/html')
-            self.end_headers()
-            self.wfile.write(getContent())
-            return
-        except IOError:
-            self.send_error(404, 'File Not Found: %s' % self.path) 
+        self.send_response(200)
+        self.send_header('Content-type', 'text/html')
+        self.end_headers()
+        self.wfile.write(getContent())
 
 def startServer():
     HandlerClass = LogViewerHTTPHandler
     ServerClass = BaseHTTPServer.HTTPServer
     Protocol = "HTTP/1.0"
-    
+
     server_address = ('127.0.0.1', 8000)
     HandlerClass.protocol_version = Protocol
     httpd = ServerClass(server_address, HandlerClass)
-    
+
     sa = httpd.socket.getsockname()
     print("Serving HTTP on %s port %s..." % (sa[0], sa[1]))
     httpd.serve_forever()
-    
+
 if __name__ == '__main__':
     startServer()
